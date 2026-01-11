@@ -45,16 +45,36 @@ def cleanup(df):
 
     df_clean = df.loc[:, keep].copy()
 
-    # --- 5) Wyrzucam wiersze z brakującą datą / krajem
+    # --- Wyrzucam wiersze z brakującą datą / krajem
     df_clean = df_clean.dropna(subset=["CountryCode", "Date"])
 
-    # --- 6) Konwersja policy do numeric (czasem przychodzą jako tekst)
+    # --- Konwersja policy do numeric (czasem przychodzą jako tekst)
     for c in df_clean.columns:
         if c not in id_cols:
             df_clean[c] = pd.to_numeric(df_clean[c], errors="coerce")
 
     df_clean.to_csv(CLEAN_RESTRICTIONS_DATA, index=False)
     pretty_print(df_clean)
+
+    #--- Normalizacja restrykcji
+    for column in policy_cols:
+        max_value = df_clean[column].max()
+        pretty_print(column, max_value)
+        df_clean[column] = df_clean[column] / max_value
+    
+    #--- Tworzymy rok
+    df_clean["Year"] = df_clean["Date"].astype(str).str[:4].astype(int)
+
+    filter_policy_cols = df_clean.columns.difference(["CountryName", "CountryCode", "Date", "Year"])
+    annual_df_clean = (
+        df_clean
+        .groupby(["CountryName", "Year"])[filter_policy_cols]
+        .mean()
+        .reset_index()
+    )
+    annual_df_clean.to_csv(CLEAN_RESTRICTIONS_DATA, index=False)
+    pretty_print(annual_df_clean)
+
 
 if __name__ == "__main__":
     df = pd.read_csv(RESTRICTIONS_DATA)
